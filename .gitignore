@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+dist
+.env*.local
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
+.idea/
+.vscode/
+
+# We use pnpm; don't commit the npm lockfile
+package-lock.json

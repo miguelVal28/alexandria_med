@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --- Patient theme: warm editorial calm ----------------------------- */
+.theme-patient {
+  --bg: #f5efe6;
+  --surface: #faf6ef;
+  --ink: #2d2a26;
+  --ink-muted: #6b655c;
+  --accent: #b85d3a;
+  --accent-soft: #e9c9b8;
+  --border: #e5dccb;
+  --danger: #b54a3f;
+  --warn: #c98a2b;
+  --ok: #5b7a4a;
+  --radius: 1rem;
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-inter), system-ui, sans-serif;
+}
+
+/* --- Medic theme: dense graphite power-tool ------------------------- */
+.theme-medic {
+  --bg: #1a1a1d;
+  --surface: #232327;
+  --ink: #e8e6e1;
+  --ink-muted: #9a968e;
+  --accent: #e8a23a;
+  --accent-soft: #3a2f1c;
+  --border: #2f2f33;
+  --danger: #d96a5e;
+  --warn: #e8a23a;
+  --ok: #7fb070;
+  --radius: 0.375rem;
+  --font-display: var(--font-inter), system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+  }
+
+  /* Selection */
+  ::selection {
+    background-color: var(--accent);
+    color: var(--surface);
+  }
+}
+
+@layer utilities {
+  .font-numeric {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+}
