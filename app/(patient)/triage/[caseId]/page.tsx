@@ -1,10 +1,14 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Check, Clock } from "lucide-react";
-import { findTriageCaseById } from "../_lib/triage.repository";
+import { Check, Clock, ShieldCheck } from "lucide-react";
+import { loadCaseWithInteractions } from "../_lib/triage.repository";
+import {
+  ConversationFlow,
+  type ConversationTurn,
+} from "./_components/ConversationFlow";
 
 const STATUS_LABEL: Record<string, string> = {
-  submitted: "Recibido",
+  submitted: "Conversando con el asistente",
   pending_medic_assessment: "En revisión por un profesional",
   approved: "Aprobado",
   escalated: "Escalado",
@@ -16,44 +20,82 @@ export default async function TriageCaseDetailPage({
 }: {
   params: { caseId: string };
 }) {
-  const triageCase = await findTriageCaseById(params.caseId);
-  if (!triageCase) notFound();
+  const data = await loadCaseWithInteractions(params.caseId);
+  if (!data) notFound();
 
+  const { triageCase, interactions } = data;
   const statusLabel = STATUS_LABEL[triageCase.status] ?? triageCase.status;
   const submittedAt = new Date(triageCase.submitted_at).toLocaleString(
     "es-CO",
     { dateStyle: "long", timeStyle: "short" },
   );
 
+  const turns: ConversationTurn[] = interactions.map((t) => ({
+    id: t.id,
+    turnNumber: t.turn_number,
+    actor: t.actor as "patient" | "ai" | "clinician",
+    content: t.content,
+    createdAt: t.created_at,
+  }));
+
+  // The conversation is awaiting the patient's response if the last AI turn
+  // doesn't have a patient reply yet AND the case is still in 'submitted'.
+  const isSubmitted = triageCase.status === "submitted";
+  const lastTurn = turns[turns.length - 1];
+  const awaitingResponse = isSubmitted && lastTurn?.actor === "ai";
+
   return (
-    <div className="space-y-10 max-w-2xl">
+    <div className="space-y-8 max-w-2xl">
       <header className="space-y-3">
-        <div className="mx-auto h-14 w-14 rounded-full bg-ok/15 text-ok grid place-items-center">
-          <Check className="h-7 w-7" />
-        </div>
-        <h1 className="font-display text-4xl text-ink">
-          Recibimos tu reporte.
+        {triageCase.status === "submitted" ? (
+          <div className="inline-flex items-center gap-2 text-xs text-muted">
+            <Clock className="h-4 w-4" />
+            <span>{statusLabel}</span>
+          </div>
+        ) : (
+          <div className="mx-auto h-14 w-14 rounded-full bg-ok/15 text-ok grid place-items-center">
+            {triageCase.status === "approved" ||
+            triageCase.status === "pending_medic_assessment" ? (
+              <Check className="h-7 w-7" />
+            ) : (
+              <ShieldCheck className="h-7 w-7" />
+            )}
+          </div>
+        )}
+        <h1 className="font-display text-3xl text-ink">
+          {triageCase.status === "submitted"
+            ? "Cuéntanos un poco más"
+            : "Recibimos tu reporte."}
         </h1>
-        <p className="text-muted">
-          Un profesional revisará lo que nos contaste. Te avisaremos por la
-          plataforma cuando esté listo el siguiente paso.
+        <p className="text-muted text-sm">
+          Caso {triageCase.id.slice(0, 8)} · Recibido {submittedAt}
         </p>
       </header>
 
-      <section className="rounded-themed border border-border-default bg-surface divide-y divide-border-default">
-        <Row label="Estado">
-          <span className="inline-flex items-center gap-2 rounded-full bg-accent-soft px-3 py-1 text-sm text-accent">
-            <Clock className="h-3.5 w-3.5" />
-            {statusLabel}
-          </span>
-        </Row>
-        <Row label="Recibido">{submittedAt}</Row>
-        <Row label="Síntomas">
-          {triageCase.symptoms.length > 0 ? triageCase.symptoms.join(", ") : "—"}
-        </Row>
-        <Row label="Duración">{triageCase.duration_text ?? "—"}</Row>
-        <Row label="Resumen">{triageCase.summary}</Row>
-      </section>
+      <ConversationFlow
+        caseId={triageCase.id}
+        turns={turns}
+        awaitingResponse={awaitingResponse}
+      />
+
+      {triageCase.status !== "submitted" && (
+        <section className="rounded-themed border border-border-default bg-surface p-5 text-sm space-y-2">
+          <p className="text-[10px] uppercase tracking-[0.18em] text-muted">
+            Estado
+          </p>
+          <p className="text-ink">{statusLabel}</p>
+          {triageCase.priority !== null && (
+            <p className="text-muted">
+              Prioridad asignada:{" "}
+              <span className="text-ink font-numeric">
+                P{triageCase.priority}
+              </span>
+            </p>
+          )}
+          <p className="text-muted">Síntomas: {triageCase.symptoms.join(", ") || "—"}</p>
+          <p className="text-muted">Duración: {triageCase.duration_text ?? "—"}</p>
+        </section>
+      )}
 
       <div className="flex gap-3">
         <Link
@@ -69,23 +111,6 @@ export default async function TriageCaseDetailPage({
           Otro reporte
         </Link>
       </div>
-    </div>
-  );
-}
-
-function Row({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-6">
-      <span className="text-xs uppercase tracking-[0.18em] text-muted sm:w-28 shrink-0">
-        {label}
-      </span>
-      <span className="text-ink">{children}</span>
     </div>
   );
 }
