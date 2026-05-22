@@ -1,8 +1,5 @@
 import "server-only";
-import {
-  submitInitialTriage,
-  continueTriageConversation,
-} from "@/app/(patient)/triage/_lib/triage.service";
+import { composeTriageFacade } from "@/lib/triage/composition";
 import { findActiveCaseForPatientAsSystem } from "@/app/(patient)/triage/_lib/triage.repository";
 import { createWhatsAppOutboundPort } from "@/lib/integrations/whatsapp";
 import {
@@ -19,16 +16,11 @@ export type InboundResult =
   | { status: "duplicate"; providerMessageId: string }
   | { status: "patient_not_found"; phoneE164: string };
 
-// Multi-turn aware orchestration:
-//   1. Idempotency check.
-//   2. Record raw inbound.
-//   3. Find patient by phone (else fail).
-//   4. If the patient has an OPEN case (status='submitted'), append the
-//      message as a follow-up turn and let the AI decide next step.
-//      Otherwise, treat as initial triage.
-//   5. Link the inbound message to the (new or existing) case.
-//   6. Send the AI's follow-up question back via the outbound port (if any).
-//      Otherwise send a "your case is under review" confirmation.
+const facade = composeTriageFacade();
+
+// Multi-turn aware orchestration. Uses the same TriageFacade as the web
+// channel — only the input adapter (this webhook) differs. That is the
+// Facade's reason for existing per ADR-001.
 export async function processInbound(
   payload: InboundPayload,
 ): Promise<InboundResult> {
@@ -65,7 +57,7 @@ export async function processInbound(
   let followupQuestion: string | null;
 
   if (openCase) {
-    const result = await continueTriageConversation({
+    const result = await facade.continueConversation({
       caseId: openCase.id,
       symptoms: openCase.symptoms,
       durationText: openCase.duration_text ?? "",
@@ -75,7 +67,7 @@ export async function processInbound(
     needsFollowup = result.needsFollowup;
     followupQuestion = result.followupQuestion;
   } else {
-    const result = await submitInitialTriage(
+    const result = await facade.submitInitial(
       {
         symptoms: [],
         description: payload.body,
@@ -94,9 +86,6 @@ export async function processInbound(
     triageCaseId,
   });
 
-  // Outbound message. The AI's clarifying question is allowed here — it's a
-  // generic medical question, not PHI. Once the loop closes, send a non-PHI
-  // confirmation pointing back to the platform.
   const outbound = createWhatsAppOutboundPort();
   const reply = needsFollowup
     ? followupQuestion ?? "¿Puedes contarnos un poco más?"
