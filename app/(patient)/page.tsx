@@ -1,4 +1,5 @@
 import { Activity, CalendarClock, MessageCircle, Phone } from "lucide-react";
+import { redirect } from "next/navigation";
 import { HeroGreeting } from "./_components/HeroGreeting";
 import { PrimaryActionCard } from "./_components/PrimaryActionCard";
 import { appointments } from "@/lib/mock-data/appointments";
@@ -16,9 +17,14 @@ const formatLongDate = (iso: string) => {
 };
 
 export default async function PatientHomePage() {
-  // Layout guard already ensures patient is non-null. cache() dedupes the call.
+  // The layout already redirects when there is no patient, but Next 14 can
+  // stream layout + page in parallel — the page may start rendering before
+  // the layout's redirect propagates. Guarding here avoids the noisy null
+  // crash; redirect() in this branch is idempotent if the layout already
+  // fired its own.
   const patient = await getCurrentPatient();
-  const firstName = patient!.full_name.split(" ")[0] ?? patient!.full_name;
+  if (!patient) redirect("/login");
+  const firstName = patient.full_name.split(" ")[0] ?? patient.full_name;
 
   return (
     <div className="space-y-16">

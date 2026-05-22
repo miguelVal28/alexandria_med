@@ -9,16 +9,14 @@ import {
   forceSubmitSchema,
   formatDuration,
 } from "./triage.schema";
-import {
-  submitInitialTriage,
-  continueTriageConversation,
-  forceSubmitForReview,
-} from "./triage.service";
+import { composeTriageFacade } from "@/lib/triage/composition";
 import { findTriageCaseById } from "./triage.repository";
 
 export type TriageActionState =
   | { ok: false; error: string }
   | null;
+
+const facade = composeTriageFacade();
 
 export async function submitTriageAction(
   _prev: TriageActionState,
@@ -42,7 +40,7 @@ export async function submitTriageAction(
 
   let caseId: string;
   try {
-    const result = await submitInitialTriage(parsed.data, {
+    const result = await facade.submitInitial(parsed.data, {
       patientId: user.id,
       channel: "web",
     });
@@ -77,14 +75,10 @@ export async function continueConversationAction(
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Sesión inválida" };
 
-  // Load the case to recover symptoms + duration for the AI request.
-  // RLS verifies the patient owns this case.
   const triageCase = await findTriageCaseById(parsed.data.caseId);
   if (!triageCase) {
     return { ok: false, error: "Caso no encontrado o sin permisos" };
   }
-
-  // Only allow continuation while still in patient-AI exchange.
   if (triageCase.status !== "submitted") {
     return {
       ok: false,
@@ -93,7 +87,7 @@ export async function continueConversationAction(
   }
 
   try {
-    await continueTriageConversation({
+    await facade.continueConversation({
       caseId: parsed.data.caseId,
       symptoms: triageCase.symptoms,
       durationText: triageCase.duration_text ?? "",
@@ -126,7 +120,7 @@ export async function forceSubmitAction(
   if (!user) return { ok: false, error: "Sesión inválida" };
 
   try {
-    await forceSubmitForReview(parsed.data.caseId);
+    await facade.forceSubmitForReview(parsed.data.caseId);
   } catch (e) {
     return {
       ok: false,
@@ -138,5 +132,4 @@ export async function forceSubmitAction(
   return null;
 }
 
-// Re-export so callers can reuse the duration formatter.
 export { formatDuration };

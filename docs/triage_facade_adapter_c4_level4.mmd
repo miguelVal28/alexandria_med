@@ -1,0 +1,187 @@
+---
+title: "Alexandria — Diagrama de Clases (C4 L4) — Subsistema de Triaje: Facade (entrada) + Adapter (salida hacia n8n)"
+---
+classDiagram
+    direction LR
+
+    %% ============================================================
+    %% Patrones aplicados:
+    %%   Facade (GoF) ...... TriageFacade expone el subsistema con
+    %%                       interfaz uniforme JSON para canales.
+    %%   Adapter (GoF) ..... N8nTriageEngineAdapter traduce el puerto
+    %%                       de dominio ITriageEngine al protocolo
+    %%                       HTTP de n8n (sistema externo).
+    %%   Decorator (GoF) ... CircuitBreakerTriageEngine envuelve al
+    %%                       adapter para resiliencia.
+    %%   Circuit Breaker ... aisla al dominio de fallas en n8n.
+    %%   Composition Root .. composeTriageFacade() cablea dependencias.
+    %% ============================================================
+
+    %% ---------- Canales (Consumidores de la Facade) ----------
+    namespace Canales {
+        class WhatsAppWebhookHandler {
+            <<RouteHandler>>
+            -facade: ITriageFacade
+            +POST(req: NextRequest) NextResponse
+            -validateHmacSignature(req) boolean
+        }
+
+        class WebTriageAction {
+            <<ServerAction>>
+            -facade: ITriageFacade
+            +submitTriage(form: FormData) Promise~TriageResultDTO~
+        }
+    }
+
+    %% ---------- Facade del Subsistema de Triaje ----------
+    namespace FacadeSubsistema {
+        class ITriageFacade {
+            <<interface>>
+            +startSession(req: StartSessionDTO) SessionDTO
+            +submitAnswer(req: AnswerDTO) NextStepDTO
+            +getAssessment(sessionId: string) AssessmentDTO
+        }
+
+        class TriageFacade {
+            <<facade>>
+            -service: TriageService
+            +startSession(req: StartSessionDTO) SessionDTO
+            +submitAnswer(req: AnswerDTO) NextStepDTO
+            +getAssessment(sessionId: string) AssessmentDTO
+            -toDomain(dto: AnswerDTO) TriageAnswer
+            -toDTO(domain: TriageAssessment) AssessmentDTO
+        }
+    }
+
+    %% ---------- Nucleo de Dominio ----------
+    namespace NucleoDeDominio {
+        class TriageService {
+            <<domain service>>
+            -engine: ITriageEngine
+            -patientRepo: IPatientRepository
+            -triageRepo: ITriageRepository
+            +startSession(patientId: string) TriageSession
+            +submitAnswer(answer: TriageAnswer) TriageNextStep
+            +buildAssessment(sessionId: string) TriageAssessment
+            -applyRiskRules(history, answers) RiskLevel
+        }
+
+        class TriageSession {
+            <<entity>>
+            +id: string
+            +patientId: string
+            +state: SessionState
+            +answers: TriageAnswer[]
+        }
+
+        class TriageAnswer {
+            <<value object>>
+            +sessionId: string
+            +questionId: string
+            +value: string
+        }
+
+        class TriageAssessment {
+            <<value object>>
+            +sessionId: string
+            +riskLevel: RiskLevel
+            +recommendsAppointment: boolean
+            +reviewedBy: string
+        }
+
+        class RiskLevel {
+            <<enumeration>>
+            LOW
+            MEDIUM
+            HIGH
+            CRITICAL
+        }
+    }
+
+    %% ---------- Puerto de Salida (Domain to AI Engine) ----------
+    namespace PuertoDeSalida {
+        class ITriageEngine {
+            <<interface>>
+            +orchestrateNextStep(ctx: TriageContext) EngineResponse
+            +classifyRisk(ctx: TriageContext) RiskLevel
+        }
+    }
+
+    %% ---------- Adapter hacia n8n (Driven Adapter) ----------
+    namespace AdapterHaciaN8n {
+        class CircuitBreakerTriageEngine {
+            <<decorator>>
+            -inner: ITriageEngine
+            -breaker: CircuitBreaker
+            -fallback: ManualTriageFallback
+            +orchestrateNextStep(ctx: TriageContext) EngineResponse
+            +classifyRisk(ctx: TriageContext) RiskLevel
+        }
+
+        class N8nTriageEngineAdapter {
+            <<adapter>>
+            -http: HttpClient
+            -n8nBaseUrl: string
+            -apiKey: string
+            +orchestrateNextStep(ctx: TriageContext) EngineResponse
+            +classifyRisk(ctx: TriageContext) RiskLevel
+            -phiStripping(ctx: TriageContext) SafePayload
+            -mapResponse(raw: RawResponse) EngineResponse
+        }
+    }
+
+    %% ---------- Composition Root ----------
+    namespace CompositionRoot {
+        class TriageComposition {
+            <<factory>>
+            +composeTriageFacade(env: Env)$ ITriageFacade
+        }
+    }
+
+    %% ---------- Sistemas Externos ----------
+    namespace SistemasExternos {
+        class N8nWorkflowAPI {
+            <<external>>
+            +postTriageOrchestrate() webhook
+            +postTriageClassify() webhook
+        }
+
+        class WhatsAppCloudAPI {
+            <<external>>
+            +postMessages() webhookDelivery
+        }
+    }
+
+    %% ============================================================
+    %% RELACIONES
+    %% ============================================================
+
+    %% Canales dependen de la interfaz de la Facade (dependencia)
+    WhatsAppWebhookHandler ..> ITriageFacade : use
+    WebTriageAction ..> ITriageFacade : use
+
+    %% Facade realiza la interfaz y delega al servicio
+    TriageFacade ..|> ITriageFacade : implements
+    TriageFacade --> TriageService : delegates to
+
+    %% Dominio: dependencia del puerto de salida + agregados
+    TriageService ..> ITriageEngine : use
+    TriageService *-- TriageSession : composes
+    TriageSession *-- TriageAnswer : composes
+    TriageService ..> TriageAssessment : produces
+    TriageAssessment --> RiskLevel
+
+    %% Adapter de salida: realizacion del puerto, decorado por breaker
+    N8nTriageEngineAdapter ..|> ITriageEngine : implements
+    CircuitBreakerTriageEngine ..|> ITriageEngine : implements
+    CircuitBreakerTriageEngine o-- ITriageEngine : wraps
+    N8nTriageEngineAdapter --> N8nWorkflowAPI : HTTP/JSON
+
+    %% Composition root crea las instancias concretas
+    TriageComposition ..> TriageFacade : creates
+    TriageComposition ..> TriageService : creates
+    TriageComposition ..> CircuitBreakerTriageEngine : creates
+    TriageComposition ..> N8nTriageEngineAdapter : creates
+
+    %% WhatsApp Cloud entrega webhooks al handler
+    WhatsAppCloudAPI ..> WhatsAppWebhookHandler : webhook POST
