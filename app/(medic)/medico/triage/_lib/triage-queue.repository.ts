@@ -39,7 +39,10 @@ export async function listPendingCases(): Promise<QueueRow[]> {
       )
     `,
     )
-    .in("status", ["submitted", "pending_medic_assessment"])
+    // Only show cases that are actually waiting for a medic. Cases in
+    // 'submitted' are still in the patient↔AI conversation loop and should
+    // not be claimable yet.
+    .eq("status", "pending_medic_assessment")
     .order("submitted_at", { ascending: true });
 
   if (error) throw error;

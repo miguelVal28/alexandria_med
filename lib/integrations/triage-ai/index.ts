@@ -4,7 +4,11 @@ import { createN8nAdapter } from "./n8n.adapter";
 import { createStubAdapter } from "./stub.adapter";
 
 export type { TriageAiPort } from "./port";
-export type { AiTriageRequest, AiTriageResponse } from "./types";
+export type {
+  AiTriageRequest,
+  AiTriageResponse,
+  ConversationTurn,
+} from "./types";
 
 // Adapter selection: real N8N if a webhook URL is configured, stub otherwise.
 // This is the only place that decides which implementation runs; the service

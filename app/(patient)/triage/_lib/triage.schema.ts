@@ -24,7 +24,23 @@ export const triageSubmitSchema = z
   })
   .refine((d) => d.symptoms.length > 0 || d.description.trim().length > 0, {
     message: "Selecciona un síntoma o descríbelo con tus palabras",
-    path: ["symptoms"],
+    path: ["description"],
   });
 
 export type TriageSubmitInput = z.infer<typeof triageSubmitSchema>;
+
+// Follow-up answer schema: just the patient's response to the AI's question.
+export const followupSchema = z.object({
+  caseId: z.string().uuid(),
+  answer: z
+    .string()
+    .min(1, "Responde para continuar")
+    .max(2000, "Máximo 2000 caracteres"),
+});
+
+export type FollowupInput = z.infer<typeof followupSchema>;
+
+// Force-submit schema: patient skips the rest of the AI loop.
+export const forceSubmitSchema = z.object({
+  caseId: z.string().uuid(),
+});
