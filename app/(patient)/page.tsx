@@ -2,6 +2,7 @@ import { Activity, CalendarClock, MessageCircle, Phone } from "lucide-react";
 import { HeroGreeting } from "./_components/HeroGreeting";
 import { PrimaryActionCard } from "./_components/PrimaryActionCard";
 import { appointments } from "@/lib/mock-data/appointments";
+import { getCurrentPatient } from "./_lib/patient.loader";
 
 const nextAppointment = appointments.find((a) => a.status !== "Realizada");
 
@@ -14,10 +15,14 @@ const formatLongDate = (iso: string) => {
   });
 };
 
-export default function PatientHomePage() {
+export default async function PatientHomePage() {
+  // Layout guard already ensures patient is non-null. cache() dedupes the call.
+  const patient = await getCurrentPatient();
+  const firstName = patient!.full_name.split(" ")[0] ?? patient!.full_name;
+
   return (
     <div className="space-y-16">
-      <HeroGreeting name="María" />
+      <HeroGreeting name={firstName} />
 
       <section className="grid sm:grid-cols-2 gap-5">
         <PrimaryActionCard

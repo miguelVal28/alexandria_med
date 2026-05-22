@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { LogoutButton } from "@/app/(auth)/_components/LogoutButton";
 
 const links = [
   { href: "/", label: "Inicio" },
@@ -7,7 +9,15 @@ const links = [
   { href: "/mensajes", label: "Mensajes" },
 ];
 
-export function PatientNav() {
+export function PatientNav({
+  fullName,
+  firstName: _firstName,
+  initial,
+}: {
+  fullName: string;
+  firstName: string;
+  initial: string;
+}) {
   return (
     <header className="border-b border-border-default bg-canvas/80 backdrop-blur sticky top-0 z-30">
       <div className="mx-auto max-w-5xl px-6 h-16 flex items-center justify-between">
@@ -27,12 +37,17 @@ export function PatientNav() {
         </nav>
         <div className="flex items-center gap-3">
           <div className="hidden sm:block text-right leading-tight">
-            <p className="text-sm text-ink">María Salazar</p>
+            <p className="text-sm text-ink">{fullName}</p>
             <p className="text-xs text-muted">Paciente</p>
           </div>
           <div className="h-9 w-9 rounded-full bg-accent text-canvas grid place-items-center font-display text-sm">
-            M
+            {initial}
           </div>
+          <LogoutButton>
+            <Button type="submit" variant="ghost" size="sm">
+              Salir
+            </Button>
+          </LogoutButton>
         </div>
       </div>
     </header>

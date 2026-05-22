@@ -10,6 +10,8 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { LogoutButton } from "@/app/(auth)/_components/LogoutButton";
 
 const links = [
   { href: "/medico", label: "Dashboard", icon: LayoutDashboard },
@@ -18,7 +20,15 @@ const links = [
   { href: "/medico/agenda", label: "Agenda", icon: CalendarRange },
 ];
 
-export function MedicSidebar() {
+export function MedicSidebar({
+  fullName,
+  specialty,
+  initials,
+}: {
+  fullName: string;
+  specialty: string;
+  initials: string;
+}) {
   const path = usePathname();
   return (
     <aside className="w-60 shrink-0 border-r border-border-default bg-surface flex flex-col">
@@ -43,7 +53,7 @@ export function MedicSidebar() {
                 "flex items-center gap-3 mx-2 px-3 py-2 rounded-md transition-colors",
                 active
                   ? "bg-canvas text-ink border border-border-default"
-                  : "text-muted hover:text-ink hover:bg-canvas/60 border border-transparent"
+                  : "text-muted hover:text-ink hover:bg-canvas/60 border border-transparent",
               )}
             >
               <Icon className="h-4 w-4" />
@@ -61,18 +71,23 @@ export function MedicSidebar() {
         </div>
       </nav>
 
-      <div className="px-3 py-4 border-t border-border-default">
+      <div className="px-3 py-4 border-t border-border-default space-y-3">
         <div className="flex items-center gap-3">
           <div className="h-8 w-8 rounded-md bg-accent-soft text-accent grid place-items-center font-numeric text-sm border border-accent/30">
-            CR
+            {initials}
           </div>
           <div className="leading-tight">
-            <p className="text-sm text-ink">Dra. Restrepo</p>
+            <p className="text-sm text-ink">{fullName}</p>
             <p className="text-[10px] text-muted uppercase tracking-wider">
-              Med. interna
+              {specialty}
             </p>
           </div>
         </div>
+        <LogoutButton>
+          <Button type="submit" variant="ghost" size="sm" className="w-full">
+            Cerrar sesión
+          </Button>
+        </LogoutButton>
       </div>
     </aside>
   );
