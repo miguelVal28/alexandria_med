@@ -105,6 +105,7 @@ export type Database = {
           site_id: string
           source_channel: Database["public"]["Enums"]["channel"]
           status: Database["public"]["Enums"]["appointment_status"]
+          triage_case_id: string | null
           updated_at: string
         }
         Insert: {
@@ -118,6 +119,7 @@ export type Database = {
           site_id: string
           source_channel: Database["public"]["Enums"]["channel"]
           status?: Database["public"]["Enums"]["appointment_status"]
+          triage_case_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -131,6 +133,7 @@ export type Database = {
           site_id?: string
           source_channel?: Database["public"]["Enums"]["channel"]
           status?: Database["public"]["Enums"]["appointment_status"]
+          triage_case_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -153,6 +156,13 @@ export type Database = {
             columns: ["site_id"]
             isOneToOne: false
             referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointments_triage_case_id_fkey"
+            columns: ["triage_case_id"]
+            isOneToOne: false
+            referencedRelation: "triage_cases"
             referencedColumns: ["id"]
           },
         ]
