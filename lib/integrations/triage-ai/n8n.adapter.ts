@@ -1,4 +1,4 @@
-// import "server-only";
+import "server-only";
 import type { ITriageEngine } from "./port";
 import type { AiTriageRequest, AiTriageResponse } from "./types";
 
@@ -25,7 +25,7 @@ export class N8nTriageEngineAdapter implements ITriageEngine {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(sanitized),
-      signal: AbortSignal.timeout(60_000),
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!res.ok) {
