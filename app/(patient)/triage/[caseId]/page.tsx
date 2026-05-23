@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Check, Clock, ShieldCheck } from "lucide-react";
+import { CalendarPlus, Check, Clock, ShieldCheck } from "lucide-react";
 import { loadCaseWithInteractions } from "../_lib/triage.repository";
 import {
   ConversationFlow,
@@ -94,6 +94,27 @@ export default async function TriageCaseDetailPage({
           )}
           <p className="text-muted">Síntomas: {triageCase.symptoms.join(", ") || "—"}</p>
           <p className="text-muted">Duración: {triageCase.duration_text ?? "—"}</p>
+        </section>
+      )}
+
+      {triageCase.status === "approved" && (
+        <section className="rounded-themed border border-accent/30 bg-accent-soft/40 p-5 space-y-3">
+          <div className="space-y-1">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-accent">
+              Próximo paso
+            </p>
+            <p className="text-ink text-sm">
+              Tu caso fue aprobado. Agenda una cita de seguimiento con el
+              profesional que lo revisó.
+            </p>
+          </div>
+          <Link
+            href={`/citas/nueva?triageCaseId=${triageCase.id}`}
+            className="inline-flex items-center gap-2 h-10 px-4 rounded-themed bg-accent text-canvas text-sm font-medium hover:opacity-90"
+          >
+            <CalendarPlus className="h-4 w-4" />
+            Agendar cita
+          </Link>
         </section>
       )}
 
