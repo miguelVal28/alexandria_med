@@ -1,4 +1,4 @@
-import "server-only";
+// import "server-only";
 import type { ITriageEngine } from "./port";
 import type { AiTriageRequest, AiTriageResponse } from "./types";
 
@@ -7,7 +7,8 @@ type SanitizedRequest = {
   iteration_number: number;
   symptoms: string[];
   duration_text: string;
-  conversation: Array<{ actor: "patient" | "ai"; content: string }>;
+  conversation: Array<{ actor: "patient" | "system"; content: string }>;
+  n8n_execution_id: string | null;
 };
 
 // Driven adapter that turns the ITriageEngine port into HTTP calls to the
@@ -15,7 +16,7 @@ type SanitizedRequest = {
 // adapter) and ADR-004 (PHI stripping as a private method of the adapter,
 // not as a separate Proxy/Decorator — keeps the audit point local).
 export class N8nTriageEngineAdapter implements ITriageEngine {
-  constructor(private readonly webhookUrl: string) {}
+  constructor(private readonly webhookUrl: string) { }
 
   async assess(req: AiTriageRequest): Promise<AiTriageResponse> {
     const sanitized = this.phiStripping(req);
@@ -24,14 +25,21 @@ export class N8nTriageEngineAdapter implements ITriageEngine {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(sanitized),
-      signal: AbortSignal.timeout(15_000),
+      signal: AbortSignal.timeout(60_000),
     });
 
     if (!res.ok) {
       throw new Error(`N8N triage webhook returned HTTP ${res.status}`);
     }
 
-    const json = (await res.json()) as Record<string, unknown>;
+    const text = await res.text();
+    let json: Record<string, any>;
+    try {
+      json = JSON.parse(text);
+    } catch (e) {
+      throw new Error(`N8N no devolvió un JSON válido. Recibido: "${text.slice(0, 100)}..."`);
+    }
+
     const sp = json.suggested_priority;
     const needsFollowup = json.needs_followup === true;
     const rawFollowup = json.followup_question;
@@ -49,7 +57,7 @@ export class N8nTriageEngineAdapter implements ITriageEngine {
           : "n8n-unknown",
       n8nExecutionId:
         typeof json.n8n_execution_id === "string" &&
-        json.n8n_execution_id.length > 0
+          json.n8n_execution_id.length > 0
           ? json.n8n_execution_id
           : `n8n-${crypto.randomUUID()}`,
       needsFollowup,
@@ -70,9 +78,10 @@ export class N8nTriageEngineAdapter implements ITriageEngine {
       symptoms: input.symptoms,
       duration_text: input.durationText,
       conversation: input.conversation.map((t) => ({
-        actor: t.actor,
+        actor: t.actor === "patient" ? "patient" : "system",
         content: t.content,
       })),
+      n8n_execution_id: null,
     };
 
     // Defensive check: if a future caller adds a field to AiTriageRequest,
@@ -87,6 +96,7 @@ export class N8nTriageEngineAdapter implements ITriageEngine {
           "conversation",
         ].includes(k),
     );
+
     if (extraKeys.length > 0) {
       throw new Error(
         `N8nTriageEngineAdapter.phiStripping refused unknown fields: ${extraKeys.join(
